@@ -2,8 +2,9 @@ import os
 import fitz  # PyMuPDF
 
 class PDFCutter:
-    input_dir = r"C:\Users\Astana\Desktop\Client"
-    output_dir = r"C:\Users\Astana\Desktop\Client\pdf_обрезанные"
+    def __init__(self):
+        self.input_dir = input("Введите путь к папке с PDF файлами: ")
+        self.output_dir = os.path.join(self.input_dir, "pdf_обрезанные")
 
     def crop_pdfs(self, left=0, top=400, right=290, bottom=0):
         """Обрезает PDF, изменяя область видимости страниц (CropBox)."""
