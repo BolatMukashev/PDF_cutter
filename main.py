@@ -8,10 +8,8 @@ from textual.widgets import (
     Button,
     Static,
     RichLog,
-    RadioSet,
-    RadioButton,
 )
-from textual.containers import Vertical, Horizontal
+from textual.containers import Vertical
 
 
 SOURCE_DIR_NAME = "исходники PDF"
@@ -24,14 +22,14 @@ class PDFProcessor:
         self.source_dir = os.path.join(base_dir, SOURCE_DIR_NAME)
         self.log = log
 
-    def process(self, mode: str, left: int, top: int, right: int, bottom: int):
+    def process(self):
         if not os.path.isdir(self.base_dir):
             self.log.write("❌ Неверный путь к папке")
             return
 
         self._create_source_dir()
         self._move_original_pdfs()
-        self._crop_pdfs(mode, left, top, right, bottom)
+        self._crop_pdfs()
         self._merge_pdfs()
         self._cleanup_base_dir()
 
@@ -50,7 +48,12 @@ class PDFProcessor:
                 )
                 self.log.write(f"📦 Перемещён: {filename}")
 
-    def _crop_pdfs(self, mode, left, top, right, bottom):
+    def _crop_pdfs(self):
+        left = 0
+        top = 400
+        right = 290
+        bottom = 0
+
         for filename in os.listdir(self.source_dir):
             if not filename.lower().endswith(".pdf"):
                 continue
@@ -63,27 +66,12 @@ class PDFProcessor:
             for page in doc:
                 rect = page.rect
 
-                if mode == "quarter":
-                    new_rect = fitz.Rect(
-                        rect.x0 + left,
-                        rect.y0 + top,
-                        rect.x1 - right,
-                        rect.y1 - bottom,
-                    )
-
-                elif mode == "half":
-                    # берем верхнюю половину страницы
-                    new_y1 = rect.y0 + rect.height / 2  # верхняя половина
-                    new_rect = fitz.Rect(
-                        rect.x0,
-                        rect.y0,
-                        rect.x1,
-                        min(new_y1, rect.y1),  # гарантируем, что не выйдем за нижний край
-                    )
-
-
-                else:
-                    continue
+                new_rect = fitz.Rect(
+                    rect.x0 + left,
+                    rect.y0 + top,
+                    rect.x1 - right,
+                    rect.y1 - bottom,
+                )
 
                 page.set_cropbox(new_rect)
                 page.set_mediabox(new_rect)
@@ -131,11 +119,6 @@ class PDFCutterApp(App):
         margin-top: 1;
     }
     
-    RadioSet {
-        height: auto;
-        padding: 0;
-    }
-    
     Input {
         margin: 0;
     }
@@ -143,21 +126,6 @@ class PDFCutterApp(App):
     Static {
         height: 1;
         padding: 0;
-        margin-top: 1;
-    }
-    
-    #dir {
-        margin-bottom: 0;
-    }
-    
-    #params-container {
-        height: auto;
-        margin: 0;
-    }
-    
-    #params-inputs {
-        height: 3;
-        margin: 0;
     }
     
     Button {
@@ -170,23 +138,7 @@ class PDFCutterApp(App):
         with Vertical(id="controls"):
             yield Static("📂 Путь к папке с PDF")
             yield Input(placeholder="C:/PDF", id="dir")
-
-            yield Static("✂️ Режим обрезки")
-            yield RadioSet(
-                RadioButton("1/4 листа", id="quarter", value=True),
-                RadioButton("1/2 листа", id="half"),
-                id="mode",
-            )
-
-            with Vertical(id="params-container"):
-                yield Static("⚙️ Параметры (только для 1/4)")
-                with Horizontal(id="params-inputs"):
-                    yield Input("0", id="left")
-                    yield Input("400", id="top")
-                    yield Input("290", id="right")
-                    yield Input("0", id="bottom")
-
-            yield Button("Обрезать PDF", id="process")
+            yield Button("Обрезать и объединить PDF", id="process")
 
         yield RichLog(id="log", wrap=True)
 
@@ -194,20 +146,12 @@ class PDFCutterApp(App):
         if event.button.id != "process":
             return
 
-        mode = "quarter" if self.query_one("#quarter", RadioButton).value else "half"
-
         processor = PDFProcessor(
             self.query_one("#dir", Input).value,
             self.query_one("#log", RichLog),
         )
 
-        processor.process(
-            mode=mode,
-            left=int(self.query_one("#left", Input).value),
-            top=int(self.query_one("#top", Input).value),
-            right=int(self.query_one("#right", Input).value),
-            bottom=int(self.query_one("#bottom", Input).value),
-        )
+        processor.process()
 
 
 if __name__ == "__main__":
