@@ -26,7 +26,7 @@ class PDFProcessor:
         self.source_dir = os.path.join(base_dir, SOURCE_DIR_NAME)
         self.log = log
 
-    def process(self, layout_mode: str):
+    def process(self, layout_mode: str, with_border: bool):
         if not os.path.isdir(self.base_dir):
             self.log.write("❌ Неверный путь к папке")
             return
@@ -37,9 +37,9 @@ class PDFProcessor:
         self._merge_pdfs()
         
         if layout_mode == "4in1":
-            self._create_4in1_layout()
+            self._create_4in1_layout(with_border)
         elif layout_mode == "6in1":
-            self._create_6in1_layout()
+            self._create_6in1_layout(with_border)
         
         self._cleanup_base_dir()
 
@@ -104,9 +104,14 @@ class PDFProcessor:
         merged.close()
         self.log.write(f"📎 Итоговый файл: {MERGED_FILENAME}")
 
-    def _create_4in1_layout(self):
+    def _draw_border(self, page, rect, border_width=1, border_color=(0, 0, 0)):
+        """Рисует рамку вокруг прямоугольника"""
+        page.draw_rect(rect, color=border_color, width=border_width)
+
+    def _create_4in1_layout(self, with_border=False):
         """Создает PDF с 4 обрезанными страницами на одной вертикальной странице (2x2)"""
-        self.log.write("📐 Создание макета 4 в 1...")
+        border_text = " с рамкой" if with_border else ""
+        self.log.write(f"📐 Создание макета 4 в 1{border_text}...")
         
         # Открываем объединенный PDF
         source_pdf = fitz.open(os.path.join(self.base_dir, MERGED_FILENAME))
@@ -155,6 +160,10 @@ class PDFProcessor:
                         # Создаем прямоугольник для размещения
                         rect = fitz.Rect(x, y, x + scaled_width, y + scaled_height)
                         new_page.show_pdf_page(rect, source_pdf, page.number)
+                        
+                        # Рисуем рамку если нужно
+                        if with_border:
+                            self._draw_border(new_page, rect, border_width=1.5)
         
         # Сохраняем результат
         output_path = os.path.join(self.base_dir, LAYOUT_4IN1_FILENAME)
@@ -162,11 +171,12 @@ class PDFProcessor:
         output_pdf.close()
         source_pdf.close()
         
-        self.log.write(f"📎 Создан макет 4 в 1: {LAYOUT_4IN1_FILENAME}")
+        self.log.write(f"📎 Создан макет 4 в 1{border_text}: {LAYOUT_4IN1_FILENAME}")
 
-    def _create_6in1_layout(self):
+    def _create_6in1_layout(self, with_border=False):
         """Создает PDF с 6 обрезанными страницами на одной горизонтальной странице (2x3)"""
-        self.log.write("📐 Создание макета 6 в 1...")
+        border_text = " с рамкой" if with_border else ""
+        self.log.write(f"📐 Создание макета 6 в 1{border_text}...")
         
         # Открываем объединенный PDF
         source_pdf = fitz.open(os.path.join(self.base_dir, MERGED_FILENAME))
@@ -216,6 +226,10 @@ class PDFProcessor:
                         # Создаем прямоугольник для размещения
                         rect = fitz.Rect(x, y, x + scaled_width, y + scaled_height)
                         new_page.show_pdf_page(rect, source_pdf, page.number)
+                        
+                        # Рисуем рамку если нужно
+                        if with_border:
+                            self._draw_border(new_page, rect, border_width=1.5)
         
         # Сохраняем результат
         output_path = os.path.join(self.base_dir, LAYOUT_6IN1_FILENAME)
@@ -223,7 +237,7 @@ class PDFProcessor:
         output_pdf.close()
         source_pdf.close()
         
-        self.log.write(f"📎 Создан макет 6 в 1: {LAYOUT_6IN1_FILENAME}")
+        self.log.write(f"📎 Создан макет 6 в 1{border_text}: {LAYOUT_6IN1_FILENAME}")
 
     def _cleanup_base_dir(self):
         for filename in os.listdir(self.base_dir):
@@ -285,6 +299,13 @@ class PDFCutterApp(App):
                 id="layout_mode",
             )
             
+            yield Static("🖼️ Рамка страницы")
+            yield RadioSet(
+                RadioButton("Без рамки", id="no-border", value=True),
+                RadioButton("С рамкой", id="with-border"),
+                id="border_mode",
+            )
+            
             yield Button("Обрезать и объединить PDF", id="process")
 
         yield RichLog(id="log", wrap=True)
@@ -301,12 +322,15 @@ class PDFCutterApp(App):
         else:
             layout_mode = "none"
 
+        # Определяем режим рамки
+        with_border = self.query_one("#with-border", RadioButton).value
+
         processor = PDFProcessor(
             self.query_one("#dir", Input).value,
             self.query_one("#log", RichLog),
         )
 
-        processor.process(layout_mode)
+        processor.process(layout_mode, with_border)
 
 
 if __name__ == "__main__":
