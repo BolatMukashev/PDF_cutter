@@ -325,8 +325,15 @@ class PDFCutterApp(App):
         # Определяем режим рамки
         with_border = self.query_one("#with-border", RadioButton).value
 
+        path = self.query_one("#dir", Input).value.strip()
+
+        # Если путь вставлен в кавычках
+        if (path.startswith("'") and path.endswith("'")) or \
+        (path.startswith('"') and path.endswith('"')):
+            path = path[1:-1]
+
         processor = PDFProcessor(
-            self.query_one("#dir", Input).value,
+            path,
             self.query_one("#log", RichLog),
         )
 
